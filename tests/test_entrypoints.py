@@ -33,7 +33,7 @@ class EntrypointTests(unittest.TestCase):
     def test_data_directory_can_be_overridden(self):
         with tempfile.TemporaryDirectory() as directory:
             with patch.dict(os.environ, {"PESCAAUTO_DATA_DIR": directory}):
-                self.assertEqual(data_directory(), Path(directory))
+                self.assertEqual(data_directory(), Path(directory).resolve())
 
     def test_icon_is_available_to_gui(self):
         self.assertTrue(icon_path().is_file())
@@ -42,7 +42,7 @@ class EntrypointTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             executable = str(Path(directory) / "PescaAuto")
             with patch.object(sys, "frozen", True, create=True), patch.object(sys, "executable", executable):
-                self.assertEqual(data_directory(), Path(directory))
+                self.assertEqual(data_directory(), Path(directory).resolve())
 
     def test_zone_calibration_uses_packaged_overlay(self):
         config = {}
