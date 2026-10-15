@@ -1,0 +1,43 @@
+name: Ejecutables
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            artifact: PescaAuto-Linux
+          - os: windows-latest
+            artifact: PescaAuto-Windows
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instalar dependencias
+        run: python -m pip install ".[build]"
+      - name: Probar
+        run: python -m unittest discover -s tests -v
+      - name: Construir ejecutables
+        run: python scripts/build.py
+      - name: Guardar ejecutables Linux
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/PescaAuto-Linux.tar.gz
+      - name: Guardar ejecutables Windows
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/PescaAuto-Windows.zip

@@ -3,6 +3,13 @@ set -euo pipefail
 
 directorio="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 archivo="$directorio/PescaAuto.desktop"
+ejecutable="$directorio/IniciarPescaAuto"
+icono="$directorio/pescaauto/assets/pescaauto.png"
+
+if [[ -x "$directorio/PescaAuto" ]]; then
+    ejecutable="$directorio/PescaAuto"
+    icono="$directorio/PescaAuto.png"
+fi
 
 if [[ "$directorio" == *'"'* || "$directorio" == *'\\'* || "$directorio" == *$'\n'* ]]; then
     echo "La ruta contiene caracteres que no admite este generador de accesos directos." >&2
@@ -14,9 +21,9 @@ cat > "$archivo" <<EOF
 Type=Application
 Name=PescaAuto
 Comment=Pesca automática para WoW 3.3.5a con ventana de control
-Exec="$directorio/IniciarPescaAuto"
+Exec="$ejecutable"
 Path=$directorio
-Icon=applications-games
+Icon=$icono
 Terminal=false
 Categories=Game;
 StartupNotify=false

@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pescaauto"
+version = "0.1.0"
+description = "Pesca y calibración visual para WoW en Linux y Windows"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "python-xlib; sys_platform == 'linux'",
+    "mss; sys_platform == 'win32'",
+    "PyQt6",
+]
+
+[project.optional-dependencies]
+build = ["pyinstaller>=6.15", "pillow"]
+
+[project.scripts]
+pesca-auto = "pescaauto.engine:main"
+
+[project.gui-scripts]
+pesca-auto-gui = "pescaauto.gui:main"
+
+[tool.setuptools.packages.find]
+include = ["pescaauto*"]
+
+[tool.setuptools.package-data]
+pescaauto = ["assets/*.png", "assets/*.ico"]
