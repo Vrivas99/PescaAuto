@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+directorio="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+archivo="$directorio/PescaAuto.desktop"
+
+if [[ "$directorio" == *'"'* || "$directorio" == *'\\'* || "$directorio" == *$'\n'* ]]; then
+    echo "La ruta contiene caracteres que no admite este generador de accesos directos." >&2
+    exit 1
+fi
+
+cat > "$archivo" <<EOF
+[Desktop Entry]
+Type=Application
+Name=PescaAuto
+Comment=Pesca automática para WoW 3.3.5a con ventana de control
+Exec="$directorio/IniciarPescaAuto"
+Path=$directorio
+Icon=applications-games
+Terminal=false
+Categories=Game;
+StartupNotify=false
+EOF
+
+chmod +x "$archivo"
+echo "Acceso directo creado en $archivo"
