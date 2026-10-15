@@ -34,7 +34,11 @@ SETTLE_SECONDS = 1.0
 FIND_RETRY_SECONDS = 0.4
 BITE_ARM_SECONDS = 2.0
 EARLY_BITE_PIXELS = 18
-EARLY_BITE_CLUSTER = 12
+EARLY_BITE_CLUSTER = 16
+LATE_BITE_PIXELS = 25
+LATE_BITE_CLUSTER = 16
+BOBBER_MIN_PIXELS = 40
+BOBBER_SINK_RATIO = 0.82
 FRAME_SAMPLES = 5
 STOP_KEY = "F9"
 BUFF_KEY = "2"
@@ -416,6 +420,14 @@ def largest_connected_region(mask):
     return largest
 
 
+def warm_bobber_area(frame, area):
+    """Cuenta los píxeles cálidos del corcho, separados del agua azul."""
+    red, green, blue = np.moveaxis(frame.astype(np.int16), -1, 0)
+    return int(np.count_nonzero(
+        (red > green + 25) & (red > blue + 12) & (red > 80) & area
+    ))
+
+
 class SplashTracker:
     """Busca un destello localizado de agua respecto al aspecto reciente."""
 
@@ -434,6 +446,9 @@ class SplashTracker:
         # Incluye la salpicadura cercana en corchos pequeños o lejanos.
         self.inner = (distance >= 4 ** 2) & (distance <= 32 ** 2)
         self.outer = (distance > 32 ** 2) & (distance <= 38 ** 2)
+        self.bobber_area = distance <= 32 ** 2
+        self.bobber_reference = warm_bobber_area(np.median(stack, axis=0), self.bobber_area)
+        self.last_bobber_area = self.bobber_reference
         self.consecutive = 0
         self.last_count = 0
         self.last_cluster = 0
@@ -452,6 +467,7 @@ class SplashTracker:
         localized = inside >= 10 and inside / inner_area > (outside / outer_area) * 1.4
         self.consecutive = self.consecutive + 1 if localized else 0
         self.last_count = inside
+        self.last_bobber_area = warm_bobber_area(pixels, self.bobber_area)
         self.last_cluster = (
             largest_connected_region(splash_pixels & self.inner)
             if inside >= EARLY_BITE_PIXELS else 0
@@ -464,6 +480,22 @@ class SplashTracker:
             self.chroma_noise = self.chroma_noise * 0.96 + chroma_difference * 0.04
             self.chroma_reference = self.chroma_reference * 0.96 + chroma * 0.04
         return self.consecutive >= 2
+
+
+def bite_confirmed(tracker, splash, late_calibrated):
+    if not splash:
+        return False
+    if not late_calibrated:
+        return tracker.last_count >= EARLY_BITE_PIXELS and tracker.last_cluster >= EARLY_BITE_CLUSTER
+    bobber_sank = (
+        tracker.bobber_reference >= BOBBER_MIN_PIXELS
+        and tracker.last_bobber_area <= tracker.bobber_reference * BOBBER_SINK_RATIO
+    )
+    strong_splash = (
+        tracker.last_count >= LATE_BITE_PIXELS
+        and tracker.last_cluster >= LATE_BITE_CLUSTER
+    )
+    return bobber_sank or strong_splash
 
 
 def key_code(dpy, name):
@@ -729,10 +761,12 @@ def run(dpy, reader, game, config, masks, diagnostic=False, max_lances=None):
             early_noise = splash_tracker.noise.copy()
             early_chroma_reference = splash_tracker.chroma_reference.copy()
             early_chroma_noise = splash_tracker.chroma_noise.copy()
+            early_bobber_reference = splash_tracker.bobber_reference
             initial_reference = splash_tracker.reference.copy()
             initial_noise = splash_tracker.noise.copy()
             initial_chroma_reference = splash_tracker.chroma_reference.copy()
             initial_chroma_noise = splash_tracker.chroma_noise.copy()
+            initial_bobber_reference = splash_tracker.bobber_reference
         while own is not None and time.monotonic() - started < CAST_SECONDS:
             if not focused(dpy, game):
                 log("WARN", "Se perdió el foco durante el lance.")
@@ -752,15 +786,14 @@ def run(dpy, reader, game, config, masks, diagnostic=False, max_lances=None):
                 initial_noise = splash_tracker.noise.copy()
                 initial_chroma_reference = splash_tracker.chroma_reference.copy()
                 initial_chroma_noise = splash_tracker.chroma_noise.copy()
+                initial_bobber_reference = splash_tracker.bobber_reference
             frame = image_rgb(dpy, game, rect, masks)
             elapsed = time.monotonic() - started
             if diagnostic:
                 recorded_frames.append(frame)
                 recorded_times.append(elapsed)
             splash = splash_tracker.observe(frame)
-            early_bite = (splash_tracker.last_count >= EARLY_BITE_PIXELS
-                          and splash_tracker.last_cluster >= EARLY_BITE_CLUSTER)
-            if splash and (late_calibrated or early_bite):
+            if bite_confirmed(splash_tracker, splash, late_calibrated):
                 zx, zy = config["zone"][:2]
                 offset_x, offset_y = config["click_offset"]
                 click_x = zx + own.x + offset_x
@@ -783,9 +816,11 @@ def run(dpy, reader, game, config, masks, diagnostic=False, max_lances=None):
                 path, frames=np.stack(recorded_frames), times=np.asarray(recorded_times),
                 reference=initial_reference, noise=initial_noise,
                 chroma_reference=initial_chroma_reference, chroma_noise=initial_chroma_noise,
+                bobber_reference=initial_bobber_reference,
                 early_reference=early_reference, early_noise=early_noise,
                 early_chroma_reference=early_chroma_reference,
                 early_chroma_noise=early_chroma_noise,
+                early_bobber_reference=early_bobber_reference,
                 late_start_index=late_start_index,
                 center=[local_center.x, local_center.y],
                 click_time=click_time,

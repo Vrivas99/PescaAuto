@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pescaauto"
-version = "0.1.0"
+version = "0.1.1"
 description = "Pesca y calibración visual para WoW en Linux y Windows"
 readme = "README.md"
 requires-python = ">=3.10"
